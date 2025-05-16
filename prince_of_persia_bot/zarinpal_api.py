@@ -27,7 +27,7 @@ def create_payment_request(amount, description, callback_url, metadata=None):
         tuple: (authority, payment_url) if successful, otherwise (None, None).
     """
     if not ZARINPAL_MERCHANT_ID or ZARINPAL_MERCHANT_ID == "YOUR_ZARINPAL_MERCHANT_ID":
-        print("ZarinPal Merchant ID not configured.")
+        print("شناسه مرچنت زرین پال پیکربندی نشده است.") # ZarinPal Merchant ID not configured.
         return None, None
 
     payload = {
@@ -53,10 +53,10 @@ def create_payment_request(amount, description, callback_url, metadata=None):
             payment_url = ZARINPAL_STARTPAY_URL + authority
             return authority, payment_url
         else:
-            print(f"ZarinPal request failed: {response_data['errors']['code']} - {response_data['errors']['message']}")
+            print(f"درخواست زرین پال ناموفق بود: {response_data['errors']['code']} - {response_data['errors']['message']}") # ZarinPal request failed: {response_data['errors']['code']} - {response_data['errors']['message']}
             return None, None
     except requests.exceptions.RequestException as e:
-        print(f"Error creating ZarinPal payment request: {e}")
+        print(f"خطا در ایجاد درخواست پرداخت زرین پال: {e}") # Error creating ZarinPal payment request: {e}
         return None, None
 
 def verify_payment(authority, amount):
@@ -71,7 +71,7 @@ def verify_payment(authority, amount):
         tuple: (True, ref_id) if successful, otherwise (False, error_message).
     """
     if not ZARINPAL_MERCHANT_ID or ZARINPAL_MERCHANT_ID == "YOUR_ZARINPAL_MERCHANT_ID":
-        return False, "ZarinPal Merchant ID not configured."
+        return False, "شناسه مرچنت زرین پال پیکربندی نشده است."
 
     payload = {
         "merchant_id": ZARINPAL_MERCHANT_ID,
@@ -93,9 +93,9 @@ def verify_payment(authority, amount):
             ref_id = response_data['data']['ref_id']
             return True, ref_id
         else:
-            return False, f"ZarinPal verification failed: {response_data['errors']['code']} - {response_data['errors']['message']}"
+            return False, f"تایید پرداخت زرین پال ناموفق بود: {response_data['errors']['code']} - {response_data['errors']['message']}" # ZarinPal verification failed: {response_data['errors']['code']} - {response_data['errors']['message']}
     except requests.exceptions.RequestException as e:
-        return False, f"Error verifying ZarinPal payment: {e}"
+        return False, f"خطا در تایید پرداخت زرین پال: {e}" # Error verifying ZarinPal payment: {e}
 
 if __name__ == '__main__':
     # Example usage (requires a valid Merchant ID and a running callback URL)

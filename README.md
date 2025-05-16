@@ -70,8 +70,10 @@ An intelligent Telegram bot powered by the Gemini AI model, designed to answer u
     GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
     ZARINPAL_MERCHANT_ID="YOUR_ZARINPAL_MERCHANT_ID"
     BOT_CALLBACK_BASE_URL="YOUR_CALLBACK_URL" # Required for ZarinPal webhook
+    PROXY_URL="YOUR_PROXY_URL" # Optional: Configure a proxy for the Telegram bot connection
     ```
     **Note:** Replace `"YOUR_CALLBACK_URL"` with the base URL where your bot's webhook will be accessible if you implement the ZarinPal callback handler on a server.
+    **Note:** If you are in a region where direct connection to Telegram servers is restricted, you can set the `PROXY_URL` variable in the `.env` file to use a proxy for the bot's connection.
 
 6.  **Database Setup 🗄️:**
 

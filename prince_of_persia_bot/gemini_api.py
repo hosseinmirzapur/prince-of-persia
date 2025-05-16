@@ -5,12 +5,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent" # Example URL, verify with Gemini API docs
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-04-17:generateContent" # Example URL, verify with Gemini API docs
 
 def get_gemini_response(prompt):
     """Sends a prompt to the Gemini API and returns the response."""
     if not GEMINI_API_KEY:
-        print("Gemini API key not found.")
+        print("کلید API جیمینای یافت نشد.") # Gemini API key not found.
         return None
 
     headers = {
@@ -38,7 +38,7 @@ def get_gemini_response(prompt):
         response.raise_for_status() # Raise an exception for bad status codes
         return response.json()
     except requests.exceptions.RequestException as e:
-        print(f"Error calling Gemini API: {e}")
+        print(f"خطا در فراخوانی API جیمینای: {e}") # Error calling Gemini API: {e}
         return None
 
 if __name__ == '__main__':
@@ -48,9 +48,9 @@ if __name__ == '__main__':
     if response_data:
         # Basic parsing, adjust based on actual Gemini API response structure
         try:
-            print("Gemini Response:")
+            print("پاسخ جیمینای:") # Gemini Response:
             for part in response_data['candidates'][0]['content']['parts']:
                 print(part['text'])
         except (KeyError, IndexError) as e:
-            print(f"Could not parse Gemini response: {e}")
-            print("Raw response:", response_data)
+            print(f"پاسخ جیمینای قابل تجزیه نبود: {e}") # Could not parse Gemini response: {e}
+            print("پاسخ خام:", response_data) # Raw response:

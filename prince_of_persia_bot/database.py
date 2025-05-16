@@ -4,10 +4,20 @@ import datetime
 
 DATABASE_FILE = 'bot_database.db'
 
+class DatabaseError(Exception):
+    """Custom exception for database-related errors."""
+    pass
+
+def get_db_connection():
+    """Establishes a database connection, raising an error if the database file does not exist."""
+    if not os.path.exists(DATABASE_FILE):
+        raise DatabaseError(f"Database file not found: {DATABASE_FILE}. Please run database.py to create it.")
+    return sqlite3.connect(DATABASE_FILE)
+
 def create_tables():
     conn = None
     try:
-        conn = sqlite3.connect(DATABASE_FILE)
+        conn = sqlite3.connect(DATABASE_FILE) # This will create the file if it doesn't exist, intended for initial setup
         cursor = conn.cursor()
 
         # Create User Table
@@ -54,7 +64,7 @@ def create_tables():
 
         # Create Transaction Table
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS Transaction (
+            CREATE TABLE IF NOT EXISTS "Transaction" (
                 payment_id INTEGER PRIMARY KEY,
                 transaction_id TEXT,
                 amount DECIMAL,
@@ -117,7 +127,7 @@ def create_tables():
 def add_user(user_id, platform_user_id, origin, username=None, phone_number=None, initial_credits=20):
     conn = None
     try:
-        conn = sqlite3.connect(DATABASE_FILE)
+        conn = get_db_connection()
         cursor = conn.cursor()
         created_at = datetime.datetime.now().isoformat()
         cursor.execute('''
@@ -126,6 +136,8 @@ def add_user(user_id, platform_user_id, origin, username=None, phone_number=None
         ''', (user_id, platform_user_id, origin, username, phone_number, initial_credits, created_at))
         conn.commit()
         print(f"User {user_id} added or already exists.")
+    except DatabaseError as e:
+        print(f"Error adding user: {e}")
     except sqlite3.Error as e:
         print(f"Database error adding user: {e}")
     finally:
@@ -135,13 +147,16 @@ def add_user(user_id, platform_user_id, origin, username=None, phone_number=None
 def get_user_credits(user_id):
     conn = None
     try:
-        conn = sqlite3.connect(DATABASE_FILE)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT credits FROM User WHERE user_id = ?", (user_id,))
         result = cursor.fetchone()
-        if result:
+        if result and result[0]:
             return result[0]
         return None # User not found
+    except DatabaseError as e:
+        print(f"Error getting user credits: {e}")
+        return None
     except sqlite3.Error as e:
         print(f"Database error getting user credits: {e}")
         return None
@@ -149,16 +164,55 @@ def get_user_credits(user_id):
         if conn:
             conn.close()
 
+def get_user_phone_number(user_id):
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT phone_number FROM User WHERE user_id = ?", (user_id,))
+        result = cursor.fetchone()
+        if result and result[0]: # Check if result exists and phone_number is not None or empty
+            return result[0]
+        return None # User not found or phone number not set
+    except DatabaseError as e:
+        print(f"Error getting user phone number: {e}")
+        return None
+    except sqlite3.Error as e:
+        print(f"Database error getting user phone number: {e}")
+        return None
+    finally:
+        if conn:
+            conn.close()
+
+def update_user_phone_number(user_id, phone_number):
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE User SET phone_number = ? WHERE user_id = ?", (phone_number, user_id))
+        conn.commit()
+        print(f"Phone number updated for user {user_id}.")
+    except DatabaseError as e:
+        print(f"Error updating user phone number: {e}")
+    except sqlite3.Error as e:
+        print(f"Database error updating user phone number: {e}")
+    finally:
+        if conn:
+            conn.close()
+
 def get_last_message_timestamp(user_id):
     conn = None
     try:
-        conn = sqlite3.connect(DATABASE_FILE)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT timestamp FROM Message WHERE user_id = ? ORDER BY timestamp DESC LIMIT 1", (user_id,))
         result = cursor.fetchone()
         if result:
             return result[0]
         return None # No previous messages
+    except DatabaseError as e:
+        print(f"Error getting last message timestamp: {e}")
+        return None
     except sqlite3.Error as e:
         print(f"Database error getting last message timestamp: {e}")
         return None
@@ -169,11 +223,13 @@ def get_last_message_timestamp(user_id):
 def decrement_user_credits(user_id):
     conn = None
     try:
-        conn = sqlite3.connect(DATABASE_FILE)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("UPDATE User SET credits = credits - 1 WHERE user_id = ?", (user_id,))
         conn.commit()
         print(f"Credits decremented for user {user_id}.")
+    except DatabaseError as e:
+        print(f"Error decrementing user credits: {e}")
     except sqlite3.Error as e:
         print(f"Database error decrementing user credits: {e}")
     finally:
@@ -183,7 +239,7 @@ def decrement_user_credits(user_id):
 def get_cached_response(question, service):
     conn = None
     try:
-        conn = sqlite3.connect(DATABASE_FILE)
+        conn = get_db_connection()
         cursor = conn.cursor()
         current_time = datetime.datetime.now().isoformat()
         cursor.execute("SELECT response FROM Cache WHERE question = ? AND service = ? AND expires_at > ?", (question, service, current_time))
@@ -191,6 +247,9 @@ def get_cached_response(question, service):
         if result:
             return result[0]
         return None # No valid cached response
+    except DatabaseError as e:
+        print(f"Error getting cached response: {e}")
+        return None
     except sqlite3.Error as e:
         print(f"Database error getting cached response: {e}")
         return None
@@ -201,7 +260,7 @@ def get_cached_response(question, service):
 def store_cached_response(question, response, service, expires_in_seconds=300):
     conn = None
     try:
-        conn = sqlite3.connect(DATABASE_FILE)
+        conn = get_db_connection()
         cursor = conn.cursor()
         created_at = datetime.datetime.now()
         expires_at = created_at + datetime.timedelta(seconds=expires_in_seconds)
@@ -211,6 +270,8 @@ def store_cached_response(question, response, service, expires_in_seconds=300):
         ''', (question, response, service, created_at.isoformat(), expires_at.isoformat()))
         conn.commit()
         print(f"Cached response stored for service {service}.")
+    except DatabaseError as e:
+        print(f"Error storing cached response: {e}")
     except sqlite3.Error as e:
         print(f"Database error storing cached response: {e}")
     finally:
@@ -220,7 +281,7 @@ def store_cached_response(question, response, service, expires_in_seconds=300):
 def add_message(user_id, text, enhanced_text, gemini_response, deepseek_response, response_text, timestamp, response_timestamp):
     conn = None
     try:
-        conn = sqlite3.connect(DATABASE_FILE)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO Message (user_id, text, enhanced_text, gemini_response, deepseek_response, response_text, timestamp, response_timestamp)
@@ -228,6 +289,8 @@ def add_message(user_id, text, enhanced_text, gemini_response, deepseek_response
         ''', (user_id, text, enhanced_text, gemini_response, deepseek_response, response_text, timestamp, response_timestamp))
         conn.commit()
         print(f"Message added for user {user_id}.")
+    except DatabaseError as e:
+        print(f"Error adding message: {e}")
     except sqlite3.Error as e:
         print(f"Database error adding message: {e}")
     finally:
@@ -237,7 +300,7 @@ def add_message(user_id, text, enhanced_text, gemini_response, deepseek_response
 def add_plan(name, price, credits, description=None):
     conn = None
     try:
-        conn = sqlite3.connect(DATABASE_FILE)
+        conn = get_db_connection()
         cursor = conn.cursor()
         created_at = datetime.datetime.now().isoformat()
         updated_at = datetime.datetime.now().isoformat()
@@ -247,6 +310,8 @@ def add_plan(name, price, credits, description=None):
         ''', (name, price, credits, description, created_at, updated_at))
         conn.commit()
         print(f"Plan '{name}' added.")
+    except DatabaseError as e:
+        print(f"Error adding plan: {e}")
     except sqlite3.Error as e:
         print(f"Database error adding plan: {e}")
     finally:
@@ -256,10 +321,13 @@ def add_plan(name, price, credits, description=None):
 def get_all_plans():
     conn = None
     try:
-        conn = sqlite3.connect(DATABASE_FILE)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT plan_id, name, price, credits, description FROM Plan")
         return cursor.fetchall()
+    except DatabaseError as e:
+        print(f"Error getting plans: {e}")
+        return []
     except sqlite3.Error as e:
         print(f"Database error getting plans: {e}")
         return []
@@ -270,11 +338,13 @@ def get_all_plans():
 def add_credits_to_user(user_id, credits):
     conn = None
     try:
-        conn = sqlite3.connect(DATABASE_FILE)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("UPDATE User SET credits = credits + ? WHERE user_id = ?", (credits, user_id))
         conn.commit()
         print(f"Added {credits} credits to user {user_id}.")
+    except DatabaseError as e:
+        print(f"Error adding credits to user: {e}")
     except sqlite3.Error as e:
         print(f"Database error adding credits to user: {e}")
     finally:
@@ -284,7 +354,7 @@ def add_credits_to_user(user_id, credits):
 def add_payment(user_id, plan_id, amount, payment_status="pending", authority=None):
     conn = None
     try:
-        conn = sqlite3.connect(DATABASE_FILE)
+        conn = get_db_connection()
         cursor = conn.cursor()
         created_at = datetime.datetime.now().isoformat()
         cursor.execute('''
@@ -294,6 +364,9 @@ def add_payment(user_id, plan_id, amount, payment_status="pending", authority=No
         conn.commit()
         print(f"Payment recorded for user {user_id}, plan {plan_id}.")
         return cursor.lastrowid # Return the payment_id
+    except DatabaseError as e:
+        print(f"Error adding payment: {e}")
+        return None
     except sqlite3.Error as e:
         print(f"Database error adding payment: {e}")
         return None
@@ -304,7 +377,7 @@ def add_payment(user_id, plan_id, amount, payment_status="pending", authority=No
 def update_payment_status(payment_id, payment_status, completed_at=None):
     conn = None
     try:
-        conn = sqlite3.connect(DATABASE_FILE)
+        conn = get_db_connection()
         cursor = conn.cursor()
         if completed_at is None:
             completed_at = datetime.datetime.now().isoformat()
@@ -313,6 +386,8 @@ def update_payment_status(payment_id, payment_status, completed_at=None):
         ''', (payment_status, completed_at, payment_id))
         conn.commit()
         print(f"Payment {payment_id} status updated to {payment_status}.")
+    except DatabaseError as e:
+        print(f"Error updating payment status: {e}")
     except sqlite3.Error as e:
         print(f"Database error updating payment status: {e}")
     finally:
@@ -322,7 +397,7 @@ def update_payment_status(payment_id, payment_status, completed_at=None):
 def add_transaction(payment_id, transaction_id, amount, provider_status, provider_response=None):
     conn = None
     try:
-        conn = sqlite3.connect(DATABASE_FILE)
+        conn = get_db_connection()
         cursor = conn.cursor()
         created_at = datetime.datetime.now().isoformat()
         updated_at = datetime.datetime.now().isoformat()
@@ -332,6 +407,8 @@ def add_transaction(payment_id, transaction_id, amount, provider_status, provide
         ''', (payment_id, transaction_id, amount, provider_status, provider_response, created_at, updated_at))
         conn.commit()
         print(f"Transaction recorded for payment {payment_id}.")
+    except DatabaseError as e:
+        print(f"Error adding transaction: {e}")
     except sqlite3.Error as e:
         print(f"Database error adding transaction: {e}")
     finally:
@@ -341,10 +418,13 @@ def add_transaction(payment_id, transaction_id, amount, provider_status, provide
 def get_payment_details(payment_id):
     conn = None
     try:
-        conn = sqlite3.connect(DATABASE_FILE)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT payment_id, user_id, plan_id, amount, payment_status FROM Payment WHERE payment_id = ?", (payment_id,))
         return cursor.fetchone()
+    except DatabaseError as e:
+        print(f"Error getting payment details: {e}")
+        return None
     except sqlite3.Error as e:
         print(f"Database error getting payment details: {e}")
         return None
@@ -355,13 +435,38 @@ def get_payment_details(payment_id):
 def get_plan_by_id(plan_id):
     conn = None
     try:
-        conn = sqlite3.connect(DATABASE_FILE)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT plan_id, name, price, credits, description FROM Plan WHERE plan_id = ?", (plan_id,))
         return cursor.fetchone()
+    except DatabaseError as e:
+        print(f"Error getting plan by id: {e}")
+        return None
     except sqlite3.Error as e:
         print(f"Database error getting plan by id: {e}")
         return None
+    finally:
+        if conn:
+            conn.close()
+
+def empty_all_tables():
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        tables = ["User", "Plan", "Payment", "Transaction", "Message", "Cache", "API_Key"]
+        for table in tables:
+            cursor.execute(f"DELETE FROM {table}")
+            print(f"Emptied table: {table}")
+
+        conn.commit()
+        print("All tables emptied successfully.")
+
+    except DatabaseError as e:
+        print(f"Error emptying tables: {e}")
+    except sqlite3.Error as e:
+        print(f"Database error emptying tables: {e}")
     finally:
         if conn:
             conn.close()
@@ -371,3 +476,6 @@ if __name__ == '__main__':
     create_tables()
     # Example of adding a plan (can be run once initially)
     # add_plan("Basic", 10.00, 100, "100 questions per month")
+    
+    # Uncomment the following line to empty all tables
+    # empty_all_tables()
